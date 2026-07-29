@@ -8,7 +8,7 @@ import numpy as np
 import requests
 
 def get_stock_data_naver(ticker):
-    url = f"https://fchart.stock.naver.com/sise.nhn?symbol={ticker}&timeFrame=day&count=40&requestType=0"
+    url = f"https://fchart.stock.naver.com/sise.nhn?symbol={ticker}&timeFrame=day&count=60&requestType=0"
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
@@ -48,31 +48,62 @@ def get_stock_data_naver(ticker):
         print(f"Error fetching data for {ticker}: {e}")
         return None
 
-def generate_scenario(name, price, prev_price, high_30, low_30, rsi, macd_signal):
+def analyze_chart_technical(prices, highs, lows, volumes, rsi, macd_diff, vol_ratio):
+    """
+    일봉 차트 데이터를 기반으로 파동 위치 및 적용 매매기법 자동 진단
+    """
+    curr_price = prices[-1]
+    high_30 = max(highs[-30:])
+    low_30 = min(lows[-30:])
+    
+    # 이동평균선 계산
+    ma5 = np.mean(prices[-5:]) if len(prices) >= 5 else curr_price
+    ma20 = np.mean(prices[-20:]) if len(prices) >= 20 else curr_price
+    ma60 = np.mean(prices[-60:]) if len(prices) >= 60 else curr_price
+
+    technique = "눌림목 매매"
+    wave_stage = "파동 분석 중"
+
+    # 1. 공구리 돌파 및 눌림목 판단 (20일 박스권 상단 근처 및 20일선 지지)
+    box_top = max(highs[-20:-5]) if len(highs) >= 20 else high_30
+    if curr_price >= box_top * 0.97 and curr_price >= ma20:
+        technique = "공구리 돌파 및 눌림목"
+        wave_stage = "공구리(박스권) 상단 돌파 후 지지 확인 구간"
+    # 2. 역매공파 (역배열 매집 완료 후 골파기 탈출)
+    elif ma20 < ma60 and curr_price > ma20 and vol_ratio >= 1.5:
+        technique = "역매공파 (역배열 수급 유입)"
+        wave_stage = "역배열 하단 매집 완료 / 1차 분할 매수 타점"
+    # 3. 밥그릇 파동 판단
+    elif curr_price > ma20 and ma20 > ma60:
+        technique = "밥그릇 3파 (주세 분출)"
+        wave_stage = "밥그릇 3파 진행 중 (우상향 상승 파동)"
+    elif curr_price <= ma20 and curr_price > low_30 * 1.05:
+        technique = "밥그릇 2파 (골파기 지지)"
+        wave_stage = "밥그릇 2파 지지 구간 (박스권 하단 매수)"
+    else:
+        technique = "피보나치 조정대 매매"
+        wave_stage = "단기 조정 / 지지선 추적 구간"
+
+    # 피보나치 지지/저항 라인 산출
     diff = high_30 - low_30 if high_30 > low_30 else 1
     fib_382 = int(high_30 - (diff * 0.382))
     fib_618 = int(high_30 - (diff * 0.618))
-    target_price = int(price * 1.08)
-    stop_loss = int(low_30 * 0.98)
+    target_price = int(high_30 * 1.05) if curr_price >= high_30 * 0.95 else int(curr_price * 1.08)
+    stop_loss = int(low_30 * 0.97)
 
-    rate_day = round(((price - prev_price) / prev_price) * 100, 2) if prev_price > 0 else 0.0
+    # 시나리오 문장 생성
+    scenario_text = f"[{datetime.now().strftime('%m/%d')} 차트 진단] "
+    scenario_text += f"현재 {technique} 패턴으로 판단됩니다. "
+    scenario_text += f"주요 지지선은 {fib_618:,}원이며, 손절가({stop_loss:,}원) 이탈 전까지 홀딩 유효합니다. "
     
-    scenario_text = f"[{datetime.now().strftime('%m/%d')} 대응] "
-    if rate_day > 2.0:
-        scenario_text += f"단기 강세 흐름입니다. 1차 목표가({target_price:,}원) 도달 여부 주시, "
-    elif rate_day < -2.0:
-        scenario_text += f"단기 조정 구간입니다. 지지 라인인 {fib_618:,}원 이탈 주의가 필요합니다. "
-    else:
-        scenario_text += f"전일 대비 횡보세입니다. 지지선({fib_382:,}원) 부근 안착 후 대응을 추천합니다. "
-
     if rsi < 35:
-        scenario_text += f"RSI({rsi}) 과매도 진입에 따른 분할 매수 검토. "
+        scenario_text += f"RSI({rsi}) 과매도 구간으로 기술적 반등 타점입니다. "
     elif rsi > 70:
-        scenario_text += f"RSI({rsi}) 과열로 인한 비중 축소/차익실현 고려. "
-
-    scenario_text += f"(추천 매수 구간: {fib_618:,}원 / 손절가: {stop_loss:,}원)"
+        scenario_text += f"RSI({rsi}) 과열권으로 분할 익절 대응 권장합니다. "
 
     return {
+        "technique": technique,
+        "wave_stage": wave_stage,
         "scenario": scenario_text,
         "target_price": target_price,
         "stop_loss": stop_loss
@@ -87,7 +118,7 @@ def main():
     with open("portfolio.json", "r", encoding="utf-8") as f:
         config = json.load(f)
 
-    total_cash = config.get("total_cash", 0)
+    total_cash = config.get("total_cash", 10000000)
     holdings = config.get("holdings", [])
 
     processed_holdings = []
@@ -99,21 +130,19 @@ def main():
         name = item["name"]
         shares = item["shares"]
         buy_price = item["buy_price"]
-        wave_stage = item.get("wave_stage", "분석 중")
-        technique = item.get("technique", "기본 매매")
 
         hist = get_stock_data_naver(ticker)
         
-        # 데이터 수집 실패 시 기존 매수가 기반 기본 데이터 설정
         if not hist or not hist["prices"]:
-            print(f"Warning: {name}({ticker}) 주가 데이터 가져오기 실패 - 기본값 적용")
+            print(f"Warning: {name}({ticker}) 주가 데이터 수집 실패 - 기본값 반영")
             curr_price = buy_price
             prev_price = buy_price
             highs = [buy_price]
             lows = [buy_price]
             volumes = [100000]
             rsi = 50.0
-            macd_signal = False
+            vol_ratio = 1.0
+            macd_diff = 0
         else:
             prices = hist["prices"]
             highs = hist["highs"]
@@ -123,6 +152,7 @@ def main():
             curr_price = prices[-1]
             prev_price = prices[-2] if len(prices) > 1 else curr_price
 
+            # RSI 계산
             p_series = pd.Series(prices)
             delta = p_series.diff()
             up = delta.clip(lower=0)
@@ -133,11 +163,16 @@ def main():
             rsi_series = 100 - (100 / (1 + rs))
             rsi = round(float(rsi_series.iloc[-1]), 1) if not np.isnan(rsi_series.iloc[-1]) else 50.0
 
+            # MACD 계산
             ema12 = p_series.ewm(span=12, adjust=False).mean()
             ema26 = p_series.ewm(span=26, adjust=False).mean()
             macd = ema12 - ema26
             signal = macd.ewm(span=9, adjust=False).mean()
-            macd_signal = bool(macd.iloc[-1] > signal.iloc[-1])
+            macd_diff = macd.iloc[-1] - signal.iloc[-1]
+
+            # 거래량 비율 계산
+            avg_v20 = np.mean(volumes[-21:-1]) if len(volumes) >= 21 else np.mean(volumes)
+            vol_ratio = round(volumes[-1] / avg_v20, 2) if avg_v20 > 0 else 1.0
 
         buy_amount = buy_price * shares
         eval_amount = curr_price * shares
@@ -147,16 +182,14 @@ def main():
         total_buy_amount += buy_amount
         total_eval_amount += eval_amount
 
-        avg_v20 = np.mean(volumes[-21:-1]) if len(volumes) >= 21 else np.mean(volumes)
-        vol_ratio = round(volumes[-1] / avg_v20, 2) if avg_v20 > 0 else 1.0
-
-        scenario_info = generate_scenario(name, curr_price, prev_price, max(highs[-30:]), min(lows[-30:]), rsi, macd_signal)
+        # 차트 분석 엔진으로 자동 진단
+        tech_analysis = analyze_chart_technical(prices if hist else [buy_price], highs if hist else [buy_price], lows if hist else [buy_price], volumes if hist else [1000], rsi, macd_diff, vol_ratio)
 
         signals = []
-        if rsi <= 35: signals.append("매수신호: RSI 과매도")
-        elif rsi >= 70: signals.append("매도신호: RSI 과열")
-        if macd_signal: signals.append("매수신호: MACD 우상향")
-        if vol_ratio >= 2.0: signals.append("관심신호: 거래량 급증")
+        if rsi <= 35: signals.append("매수신호: RSI 과매도 구간")
+        elif rsi >= 70: signals.append("매도신호: RSI 과열 구간")
+        if macd_diff > 0: signals.append("매수신호: MACD 우상향")
+        if vol_ratio >= 2.0: signals.append("관심신호: 평소 대비 거래량 200% 이상 급증")
 
         processed_holdings.append({
             "ticker": ticker,
@@ -173,12 +206,12 @@ def main():
             "weight": 0,
             "rsi": rsi,
             "vol_ratio": vol_ratio,
-            "wave_stage": wave_stage,
-            "technique": technique,
-            "scenario": scenario_info["scenario"],
-            "target_price": scenario_info["target_price"],
-            "stop_loss": scenario_info["stop_loss"],
-            "signals": signals if signals else ["특이 신호 없음 (관망 구간)"]
+            "wave_stage": tech_analysis["wave_stage"],
+            "technique": tech_analysis["technique"],
+            "scenario": tech_analysis["scenario"],
+            "target_price": tech_analysis["target_price"],
+            "stop_loss": tech_analysis["stop_loss"],
+            "signals": signals if signals else ["특이 신호 없음 (관망 및 보유 유지)"]
         })
 
     total_assets = total_eval_amount + total_cash
@@ -190,8 +223,8 @@ def main():
 
     market_brief = {
         "date": datetime.now().strftime("%Y-%m-%d"),
-        "summary": "반도체 및 주요 관심 섹터를 중심으로 수급 유입이 지속되고 있으며, 지정된 손절가 준수 및 분할 대응이 유효합니다.",
-        "status": "전일 종가/당일 시세 정상 반영 완료"
+        "summary": "핵심 주력 섹터(반도체/AI/우주)를 중심으로 실시간 차트 수급을 분석하여 매매 시나리오를 산출합니다.",
+        "status": "전일 종가/당일 시세 및 차트 패턴 진단 완료"
     }
 
     output = {
@@ -213,7 +246,7 @@ def main():
     with open("data/portfolio_data.json", "w", encoding="utf-8") as f:
         json.dump(output, f, ensure_ascii=False, indent=2)
         
-    print("성공적으로 포트폴리오 데이터를 업데이트했습니다.")
+    print("성공적으로 포트폴리오 차트 데이터 및 진단을 완료했습니다.")
 
 if __name__ == "__main__":
     main()
