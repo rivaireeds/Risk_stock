@@ -1,5 +1,5 @@
 {
-  "total_cash": 10000000,
+  "total_cash": 1000000,
   "holdings": [
     {
       "ticker": "005930",
@@ -7,8 +7,6 @@
       "market": "KOSPI",
       "shares": 7,
       "buy_price": 229642,
-      "wave_stage": "밥그릇 3파 (상승 파동 초입)",
-      "technique": "공구리 돌파 및 눌림목 매매"
     },
     {
       "ticker": "010120",
@@ -16,17 +14,5 @@
       "market": "KOSPI",
       "shares": 5,
       "buy_price": 242900,
-      "wave_stage": "밥그릇 3파 진행 중 (고점 박스권)",
-      "technique": "5일선 타기 / 신고가 매매"
     },
     {
-      "ticker": "042700",
-      "name": "한미반도체",
-      "market": "KOSPI",
-      "shares": 50,
-      "buy_price": 120000,
-      "wave_stage": "밥그릇 2파 (골파기 후 지지)",
-      "technique": "역매공파 (역배열 매집 완료)"
-    }
-  ]
-}
