@@ -5,17 +5,17 @@
       "ticker": "005930",
       "name": "삼성전자",
       "market": "KOSPI",
-      "shares": 100,
-      "buy_price": 72000,
+      "shares": 7,
+      "buy_price": 229642,
       "wave_stage": "밥그릇 3파 (상승 파동 초입)",
       "technique": "공구리 돌파 및 눌림목 매매"
     },
     {
-      "ticker": "000660",
-      "name": "SK하이닉스",
+      "ticker": "010120",
+      "name": "LS ELECTRIC",
       "market": "KOSPI",
-      "shares": 30,
-      "buy_price": 185000,
+      "shares": 5,
+      "buy_price": 242900,
       "wave_stage": "밥그릇 3파 진행 중 (고점 박스권)",
       "technique": "5일선 타기 / 신고가 매매"
     },
