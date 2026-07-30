@@ -1,221 +1,124 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Risk Stock Portfolio Manager</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background-color: #f4f6f9; font-family: 'Pretendard', sans-serif; color: #333; }
-        .card { border-radius: 12px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .nav-pills .nav-link.active { background-color: #0d6efd; font-weight: bold; }
-        .stat-card { padding: 20px; text-align: center; }
-        .stat-title { font-size: 0.9rem; color: #6c757d; }
-        .stat-value { font-size: 1.5rem; font-weight: bold; margin-top: 5px; }
-        .up-color { color: #d63031; font-weight: bold; }
-        .down-color { color: #0984e3; font-weight: bold; }
-        .badge-signal { font-size: 0.85rem; padding: 6px 10px; margin-right: 4px; }
-        .scenario-box { background-color: #eef2f7; padding: 15px; border-left: 4px solid #0d6efd; border-radius: 4px; }
-    </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>국내주식 매수신호 스캐너</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css?v=7" />
 </head>
 <body>
 
-<div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>📈 Risk Stock Portfolio Manager</h2>
-        <ul class="nav nav-pills" id="pills-tab" role="tablist">
-            <li class="nav-item">
-                <button class="nav-link active" id="pills-page1-tab" data-bs-toggle="pill" data-bs-target="#page1" type="button">페이지 1: 포트폴리오 종합 & 시황</button>
-            </li>
-            <li class="nav-item">
-                <button class="nav-link" id="pills-page2-tab" data-bs-toggle="pill" data-bs-target="#page2" type="button">페이지 2: 종목별 시나리오 & 기술분석</button>
-            </li>
-        </ul>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-mark">●</span>
+      <span class="brand-text">신호탐지기<span class="brand-sub">KR STOCK SIGNAL SCANNER</span></span>
+    </div>
+    <nav class="top-nav">
+      <a href="index.html" class="nav-link active">신호탐지기</a>
+      <a href="portfolio.html" class="nav-link">내 포트폴리오</a>
+    </nav>
+    <div class="update-info" id="updateInfo">
+      <button id="refreshBtn" class="refresh-btn" title="최신 계산 결과를 다시 불러옵니다">
+        <span class="refresh-icon">↻</span> 새로고침
+      </button>
+      <span class="update-label">기준일</span>
+      <span class="update-time" id="dataDate">-</span>
+      <span class="update-label" style="margin-left:10px;">실행</span>
+      <span class="update-time" id="updateTime">-</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="stat-row" id="statRow">
+    <div class="stat-card">
+      <div class="stat-num" id="statScanned">-</div>
+      <div class="stat-label">전체 스캔 종목</div>
+    </div>
+    <div class="stat-card highlight">
+      <div class="stat-num" id="statSignals">-</div>
+      <div class="stat-label">신호 발견 종목</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="statUniverse">-</div>
+      <div class="stat-label">신호없어도 조회 가능</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="statMarket">KOSPI+KOSDAQ</div>
+      <div class="stat-label">대상 시장</div>
+    </div>
+  </section>
+
+  <section class="lookup-card">
+    <h3>관심종목 직접 조회</h3>
+    <p class="lookup-desc">
+      신호가 없어도 <strong>코스피·코스닥 시가총액 상위 각 150개(총 300개)</strong>는 항상 분석 데이터를 볼 수 있어요.
+      보유·관심 종목명이나 티커를 입력해보세요.
+    </p>
+    <div class="lookup-row">
+      <input type="text" id="lookupInput" class="lookup-input" placeholder="예: 삼성전자, 000660" />
+      <button id="lookupBtn" class="lookup-go">조회</button>
+    </div>
+    <div id="lookupResults"></div>
+    <p class="lookup-hint">범위 밖 종목(시총 300위 밖 + 신호 없음)은 데이터가 없을 수 있어요.</p>
+  </section>
+
+  <section class="control-row">
+    <input type="text" id="searchBox" class="search-box" placeholder="종목명 또는 티커 검색 (예: 삼성전자, 005930)" />
+
+    <div class="filter-chips" id="filterChips">
+      <button class="chip active" data-filter="ALL">전체</button>
+      <button class="chip chip-rating" data-filter="RATING:매수 적합">★ 매수 적합</button>
+      <button class="chip" data-filter="정배열">정배열</button>
+      <button class="chip" data-filter="RSI과매도탈출">RSI탈출</button>
+      <button class="chip" data-filter="MACD골든크로스">MACD</button>
+      <button class="chip" data-filter="거래량급증">거래량급증</button>
+      <button class="chip" data-filter="피보나치">피보나치지지</button>
     </div>
 
-    <div class="text-end text-muted mb-3" id="update-time" style="font-size: 0.85rem;">데이터 로딩 중...</div>
+    <select id="sortSelect" class="sort-select">
+      <option value="rating_desc">매수 적합도 높은순</option>
+      <option value="score_desc">신호점수 높은순</option>
+      <option value="change_desc">등락률 높은순</option>
+      <option value="volume_desc">거래량배수 높은순</option>
+      <option value="name_asc">종목명순</option>
+    </select>
+  </section>
 
-    <div class="tab-content" id="pills-tabContent">
-        <!-- 페이지 1 -->
-        <div class="tab-pane fade show active" id="page1">
-            <div class="row">
-                <div class="col-md-3">
-                    <div class="card stat-card">
-                        <div class="stat-title">총 매수 금액</div>
-                        <div class="stat-value" id="total-buy">- 원</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card stat-card">
-                        <div class="stat-title">총 평가 금액</div>
-                        <div class="stat-value" id="total-eval">- 원</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card stat-card">
-                        <div class="stat-title">총 평가 손익 / 수익률</div>
-                        <div class="stat-value" id="total-profit">-</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card stat-card">
-                        <div class="stat-title">주식 / 현금 비중</div>
-                        <div class="stat-value" id="asset-weight">-</div>
-                    </div>
-                </div>
-            </div>
+  <section class="table-section">
+    <table class="signal-table">
+      <thead>
+        <tr>
+          <th class="col-score">신호</th>
+          <th class="col-rating">매수 적합도</th>
+          <th class="col-name">종목</th>
+          <th class="col-price">현재가</th>
+          <th class="col-change">등락률</th>
+          <th class="col-rsi">RSI</th>
+          <th class="col-vol">거래량배수</th>
+          <th class="col-tags">감지된 신호</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="8" class="empty-state">데이터를 불러오는 중입니다...</td></tr>
+      </tbody>
+    </table>
+  </section>
 
-            <div class="card">
-                <div class="card-header bg-white fw-bold">내 보유 종목 현황</div>
-                <div class="card-body table-responsive">
-                    <table class="table table-hover align-middle">
-                        <thead class="table-light">
-                            <tr>
-                                <th>종목명(코드)</th>
-                                <th>보유 주수</th>
-                                <th>평균 단가</th>
-                                <th>현재가(전일종가)</th>
-                                <th>평가 금액</th>
-                                <th>평가 손익</th>
-                                <th>수익률</th>
-                                <th>비중</th>
-                            </tr>
-                        </thead>
-                        <tbody id="holdings-table"></tbody>
-                    </table>
-                </div>
-            </div>
+  <p class="footnote">
+    본 페이지는 기술적 지표 기반 자동 스캔 결과이며, 투자 조언이나 매수·매도 추천이 아닙니다.
+    데이터는 매매일 장마감 후 자동 갱신되며(KRX 정규장 09:00~15:30 종가 기준, 넥스트레이드 애프터마켓 미반영),
+    비공식 커뮤니티 데이터 소스 특성상 지연·오류가 있을 수 있습니다. 실제 매매 전 증권사 앱에서 최종 시세를
+    확인해주세요. 투자 판단과 책임은 본인에게 있습니다.
+  </p>
 
-            <div class="card">
-                <div class="card-header bg-white fw-bold">🌐 데일리 시황 분석 (전일/당일 기준)</div>
-                <div class="card-body">
-                    <h6 id="market-date" class="text-primary fw-bold"></h6>
-                    <p id="market-summary" class="mt-2"></p>
-                    <div class="alert alert-secondary mb-0" id="market-status"></div>
-                </div>
-            </div>
-        </div>
+</main>
 
-        <!-- 페이지 2 -->
-        <div class="tab-pane fade" id="page2">
-            <div class="card">
-                <div class="card-header bg-white fw-bold">📌 종목별 현재 대응 시나리오 (매일 자동 갱신)</div>
-                <div class="card-body" id="scenario-list"></div>
-            </div>
-
-            <div class="card">
-                <div class="card-header bg-white fw-bold">🔍 종목별 파동 위치 & 매매기법 상세 체크</div>
-                <div class="card-body table-responsive">
-                    <table class="table table-bordered align-middle">
-                        <thead class="table-light">
-                            <tr>
-                                <th>종목명</th>
-                                <th>적용 매매기법</th>
-                                <th>현재 파동 위치</th>
-                                <th>목표가 (1차)</th>
-                                <th>손절가 (기준)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="technique-table"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-header bg-white fw-bold">🚨 보유 종목별 매수 / 매도 신호 감지</div>
-                <div class="card-body" id="signal-list"></div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-async function loadData() {
-    try {
-        const response = await fetch('data/portfolio_data.json');
-        const data = await response.json();
-        
-        document.getElementById('update-time').innerText = `최종 갱신: ${data.update_time}`;
-
-        const s = data.summary;
-        document.getElementById('total-buy').innerText = `${s.total_buy_amount.toLocaleString()} 원`;
-        document.getElementById('total-eval').innerText = `${s.total_eval_amount.toLocaleString()} 원`;
-        
-        const profitClass = s.total_profit_loss >= 0 ? 'up-color' : 'down-color';
-        const profitSign = s.total_profit_loss >= 0 ? '+' : '';
-        document.getElementById('total-profit').innerHTML = `<span class="${profitClass}">${profitSign}${s.total_profit_loss.toLocaleString()} 원 (${profitSign}${s.total_profit_rate}%)</span>`;
-        document.getElementById('asset-weight').innerText = `${s.stock_weight}% / ${s.cash_weight}%`;
-
-        const tableBody = document.getElementById('holdings-table');
-        tableBody.innerHTML = '';
-        data.holdings.forEach(h => {
-            const hClass = h.profit_loss >= 0 ? 'up-color' : 'down-color';
-            const hSign = h.profit_loss >= 0 ? '+' : '';
-            tableBody.innerHTML += `
-                <tr>
-                    <td><strong>${h.name}</strong> <small class="text-muted">(${h.ticker})</small></td>
-                    <td>${h.shares} 주</td>
-                    <td>${h.buy_price.toLocaleString()} 원</td>
-                    <td>${h.curr_price.toLocaleString()} 원</td>
-                    <td>${h.eval_amount.toLocaleString()} 원</td>
-                    <td class="${hClass}">${hSign}${h.profit_loss.toLocaleString()} 원</td>
-                    <td class="${hClass}">${hSign}${h.profit_rate}%</td>
-                    <td><span class="badge bg-secondary">${h.weight}%</span></td>
-                </tr>
-            `;
-        });
-
-        document.getElementById('market-date').innerText = `분석 일자: ${data.market_brief.date}`;
-        document.getElementById('market-summary').innerText = data.market_brief.summary;
-        document.getElementById('market-status').innerText = `상태: ${data.market_brief.status}`;
-
-        const scenarioContainer = document.getElementById('scenario-list');
-        scenarioContainer.innerHTML = '';
-        const techTable = document.getElementById('technique-table');
-        techTable.innerHTML = '';
-        const signalContainer = document.getElementById('signal-list');
-        signalContainer.innerHTML = '';
-
-        data.holdings.forEach(h => {
-            scenarioContainer.innerHTML += `
-                <div class="mb-3 scenario-box">
-                    <h6 class="fw-bold">${h.name} (${h.curr_price.toLocaleString()}원)</h6>
-                    <p class="mb-0 text-dark">${h.scenario}</p>
-                </div>
-            `;
-
-            techTable.innerHTML += `
-                <tr>
-                    <td><strong>${h.name}</strong></td>
-                    <td><span class="badge bg-info text-dark">${h.technique}</span></td>
-                    <td>${h.wave_stage}</td>
-                    <td class="up-color">${h.target_price.toLocaleString()} 원</td>
-                    <td class="down-color">${h.stop_loss.toLocaleString()} 원</td>
-                </tr>
-            `;
-
-            const signalBadges = h.signals.map(sig => {
-                let badgeBg = 'bg-secondary';
-                if(sig.includes('매수')) badgeBg = 'bg-danger';
-                if(sig.includes('매도')) badgeBg = 'bg-primary';
-                if(sig.includes('거래량')) badgeBg = 'bg-warning text-dark';
-                return `<span class="badge ${badgeBg} badge-signal">${sig}</span>`;
-            }).join('');
-
-            signalContainer.innerHTML += `
-                <div class="d-flex justify-content-between align-items-center border-bottom py-2">
-                    <div><strong>${h.name}</strong></div>
-                    <div>${signalBadges}</div>
-                </div>
-            `;
-        });
-
-    } catch(e) {
-        console.error("데이터 로딩 실패:", e);
-    }
-}
-document.addEventListener("DOMContentLoaded", loadData);
-</script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/dashboard.js?v=5"></script>
 </body>
 </html>
