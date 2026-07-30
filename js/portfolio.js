@@ -276,7 +276,8 @@
             <p class="lookup-hint" style="margin-bottom:10px;">
               ${distanceText(price, info.target_price_2, "2차 목표까지")}
               ${info.stop_loss ? " · " + distanceText(price, info.stop_loss, "손절가까지") : ""}
-              ${info.wave_direction ? ` · 파동: ${info.wave_direction} ${info.wave_number}파 진행중(${info.wave_progress_pct ?? "-"}%)` : ""}
+              ${info.wave_direction ? ` · 단기: ${info.wave_direction}${info.wave_number}파(${info.wave_progress_pct ?? "-"}%)` : ""}
+              ${info.wave_direction_weekly ? ` · 장기(주봉): ${info.wave_direction_weekly}${info.wave_number_weekly}파` : ""}
             </p>
 
             ${patternsHtml ? `<div style="margin-bottom:10px;">${patternsHtml}</div>` : ""}

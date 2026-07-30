@@ -154,8 +154,15 @@
         <h3>파동 위치 &amp; 매매 타점</h3>
         <div class="wave-row">
           <span class="wave-badge ${info.wave_direction === "상승" ? "wave-up" : "wave-down"}">
-            ${info.wave_direction} ${info.wave_number}파 진행 중
+            단기(일봉) ${info.wave_direction} ${info.wave_number}파
           </span>
+          ${
+            info.wave_direction_weekly
+              ? `<span class="wave-badge ${info.wave_direction_weekly === "상승" ? "wave-up" : "wave-down"}">
+                  장기(주봉) ${info.wave_direction_weekly} ${info.wave_number_weekly}파
+                </span>`
+              : ""
+          }
           <span class="wave-progress">전 스윙 대비 진행률 ${info.wave_progress_pct ?? "-"}%</span>
         </div>
         <div class="level-grid">

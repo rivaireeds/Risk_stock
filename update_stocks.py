@@ -298,8 +298,37 @@ def check_fibonacci_support(close: pd.Series):
 WAVE_BASIS_NOTE = (
     "일봉(종가) 기준 · ZigZag 8% 스윙 전환점으로 구간을 나눈 단순화된 파동 카운트입니다. "
     "정통 엘리어트파동 이론의 세부 규칙(파동 간 피보나치 비율, 3파 최단파동 금지 등)까지 "
-    "전부 검증한 것은 아니며, 참고용 스윙 위치 표시로만 활용해주세요."
+    "전부 검증한 것은 아니며, 참고용 스윙 위치 표시로만 활용해주세요. "
+    "장기(주봉) 파동은 같은 로직을 주 단위 종가로 리샘플링해서 계산하며, 단기 노이즈를 걸러낸 "
+    "큰 흐름을 참고하는 용도입니다. 데이터 소스 특성상 최대 확보 가능한 주봉 개수가 제한적일 수 있습니다."
 )
+
+
+def compute_weekly_wave(dates, close):
+    """
+    일봉을 주봉(주 마지막 종가)으로 리샘플한 뒤 같은 ZigZag 로직으로 장기 파동방향을 계산한다.
+    일봉 기준 파동은 최근 노이즈에 민감할 수 있어서, 1~2년 장기투자 관점에서는
+    노이즈를 걸러낸 주봉 기준 파동을 함께 보는 게 더 적합하다.
+    """
+    df = pd.DataFrame({"Date": pd.to_datetime(dates), "Close": close.values})
+    weekly = df.set_index("Date")["Close"].resample("W-FRI").last().dropna().reset_index(drop=True)
+
+    if len(weekly) < 5:
+        return {"wave_direction_weekly": None, "wave_number_weekly": None, "weeks_available": len(weekly)}
+
+    pivots = zigzag_pivots(weekly)
+    if not pivots:
+        return {"wave_direction_weekly": None, "wave_number_weekly": None, "weeks_available": len(weekly)}
+
+    wave_count = len(pivots) - 1
+    wave_number = ((wave_count - 1) % 5) + 1 if wave_count > 0 else 1
+    direction = "상승" if pivots[-1][2] == "high" else "하락"
+
+    return {
+        "wave_direction_weekly": direction,
+        "wave_number_weekly": wave_number,
+        "weeks_available": len(weekly),
+    }
 
 
 def analyze_wave_and_levels(close: pd.Series):
@@ -548,6 +577,7 @@ def analyze_stock(group: pd.DataFrame):
     change_rate = ((close.iloc[-1] - prev_close) / prev_close * 100) if prev_close else None
 
     wave_info = analyze_wave_and_levels(close) or {}
+    weekly_wave = compute_weekly_wave(dates, close)
     rsi_now = round(float(rsi.iloc[-1]), 1) if pd.notna(rsi.iloc[-1]) else None
     rating_stars, rating_label = compute_rating(len(signals), wave_info.get("wave_direction"), rsi_now)
     chart_patterns = compute_chart_patterns(close, ma20, ma60)
@@ -563,6 +593,8 @@ def analyze_stock(group: pd.DataFrame):
         "wave_direction": wave_info.get("wave_direction"),
         "wave_number": wave_info.get("wave_number"),
         "wave_progress_pct": wave_info.get("wave_progress_pct"),
+        "wave_direction_weekly": weekly_wave.get("wave_direction_weekly"),
+        "wave_number_weekly": weekly_wave.get("wave_number_weekly"),
         "buy_point": wave_info.get("buy_point"),
         "buy_point_2": wave_info.get("buy_point_2"),
         "target_price": wave_info.get("target_price"),
@@ -737,7 +769,8 @@ def main():
                     "price": int(last_close), "change_rate": change_rate,
                     "volume": int(group["Volume"].iloc[-1]), "volume_ratio": None,
                     "rsi": None, "wave_direction": None, "wave_number": None,
-                    "wave_progress_pct": None, "buy_point": None, "buy_point_2": None,
+                    "wave_progress_pct": None, "wave_direction_weekly": None, "wave_number_weekly": None,
+                    "buy_point": None, "buy_point_2": None,
                     "target_price": None, "target_price_2": None, "stop_loss": None,
                     "rating_stars": 1, "rating_label": "관망",
                     "chart_patterns": [],
