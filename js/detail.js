@@ -165,6 +165,13 @@
           }
           <span class="wave-progress">전 스윙 대비 진행률 ${info.wave_progress_pct ?? "-"}%</span>
         </div>
+        ${
+          info.trend_alignment
+            ? `<p class="lookup-hint" style="margin-bottom:12px;">
+                <strong style="color:var(--text);">${info.trend_alignment}</strong> — ${info.trend_alignment_note}
+              </p>`
+            : ""
+        }
         <div class="level-grid">
           <div class="level-box">
             <div class="level-label">매수타점 (조정시 38.2%)</div>

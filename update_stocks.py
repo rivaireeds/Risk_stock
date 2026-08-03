@@ -331,6 +331,24 @@ def compute_weekly_wave(dates, close):
     }
 
 
+def compute_trend_alignment(daily_dir, weekly_dir):
+    """
+    일봉(단기)과 주봉(장기) 파동 방향의 정합성을 판정한다.
+    ⚠️ 실제 파동은 프랙탈(나선) 구조라 '모순'이 아니라 '서로 다른 스케일'인 게 정상이다.
+    장기투자 관점에서는 주봉(방향성)을 우선하고, 일봉은 타이밍 참고용으로 보는 게 일반적이다.
+    """
+    if daily_dir is None or weekly_dir is None:
+        return None, None
+
+    if daily_dir == "상승" and weekly_dir == "상승":
+        return "상승 정합", "단기·장기 모두 상승 — 추세 전환 신뢰도가 상대적으로 높은 구간"
+    if daily_dir == "하락" and weekly_dir == "하락":
+        return "하락 정합", "단기·장기 모두 하락 — 아직 추세 전환으로 보기 이른 구간"
+    if daily_dir == "상승" and weekly_dir == "하락":
+        return "혼조(장기하락 중 단기반등)", "장기추세는 유지된 채 단기 반등 중 — 트레이딩 관점의 단기 구간일 수 있음"
+    return "혼조(장기상승 중 단기조정)", "장기추세는 유지된 채 단기 조정 중 — 눌림목일 가능성"
+
+
 def analyze_wave_and_levels(close: pd.Series):
     """
     ZigZag 피벗을 기반으로 (1) 지금이 몇 번째 스윙(파동)인지,
@@ -578,6 +596,9 @@ def analyze_stock(group: pd.DataFrame):
 
     wave_info = analyze_wave_and_levels(close) or {}
     weekly_wave = compute_weekly_wave(dates, close)
+    trend_alignment, trend_alignment_note = compute_trend_alignment(
+        wave_info.get("wave_direction"), weekly_wave.get("wave_direction_weekly")
+    )
     rsi_now = round(float(rsi.iloc[-1]), 1) if pd.notna(rsi.iloc[-1]) else None
     rating_stars, rating_label = compute_rating(len(signals), wave_info.get("wave_direction"), rsi_now)
     chart_patterns = compute_chart_patterns(close, ma20, ma60)
@@ -595,6 +616,8 @@ def analyze_stock(group: pd.DataFrame):
         "wave_progress_pct": wave_info.get("wave_progress_pct"),
         "wave_direction_weekly": weekly_wave.get("wave_direction_weekly"),
         "wave_number_weekly": weekly_wave.get("wave_number_weekly"),
+        "trend_alignment": trend_alignment,
+        "trend_alignment_note": trend_alignment_note,
         "buy_point": wave_info.get("buy_point"),
         "buy_point_2": wave_info.get("buy_point_2"),
         "target_price": wave_info.get("target_price"),
@@ -770,6 +793,7 @@ def main():
                     "volume": int(group["Volume"].iloc[-1]), "volume_ratio": None,
                     "rsi": None, "wave_direction": None, "wave_number": None,
                     "wave_progress_pct": None, "wave_direction_weekly": None, "wave_number_weekly": None,
+                    "trend_alignment": None, "trend_alignment_note": None,
                     "buy_point": None, "buy_point_2": None,
                     "target_price": None, "target_price_2": None, "stop_loss": None,
                     "rating_stars": 1, "rating_label": "관망",
